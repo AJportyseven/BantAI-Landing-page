@@ -1123,7 +1123,7 @@
 
     <div class="os-alert" id="osAlert">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <span>BantAI is built for Windows x64 systems. You can still download the installer and transfer it to a compatible machine.</span>
+      <span>BantAI is a Windows-only desktop application. Download the installer on a computer to install and run it — this download won't work on phones or tablets.</span>
     </div>
   </header>
 
@@ -1332,7 +1332,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
         <img src="" alt="">
-        <div class="deploy-modal-hint">Drag to pan</div>
+        <div class="deploy-modal-hint">Pinch to zoom · drag to pan</div>
       </div>
     </div>
 
@@ -1497,48 +1497,70 @@
       if (!modal || !stage || !closeBtn || !img) return;
 
       const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-      let scale = 1, tx = 0, ty = 0, minX = 0, maxX = 0, minY = 0, maxY = 0;
-      let canPan = false, dragging = false, sx = 0, sy = 0, stx = 0, sty = 0;
+      const MIN_S = 1, MAX_S = 3;
+
+      let scale = 1, tx = 0, ty = 0;
       let bound = false, settleTimer = null;
 
-      function computeFit() {
-        const iw = img.naturalWidth || 1536;
-        const ih = img.naturalHeight || 1024;
-        const sw = stage.clientWidth;
-        const sh = stage.clientHeight;
-        // CSS renders the image at width:100% (aspect kept) — transform is translate-only.
-        const dispH = ih * (sw / iw);
-        scale = 1;
-        tx = 0; ty = 0;
-        if (dispH <= sh) {
-          canPan = false;
-          minX = maxX = tx = 0;
-          minY = maxY = ty = Math.round(Math.max(0, (sh - dispH) / 2));
-        } else {
-          canPan = true;
-          minX = maxX = 0;
-          minY = Math.round(sh - dispH);
-          maxY = 0;
-        }
-        return { iw: iw, ih: ih };
+      const pointers = new Map();
+      let drag = null;   // single-finger drag anchor { id, x, y, tx, ty }
+      let pinch = null;  // two-finger pinch { prevDist }
+
+      function natural() {
+        return { iw: img.naturalWidth || 1536, ih: img.naturalHeight || 1024 };
       }
 
-      function paint(x, y, s) {
-        img.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0) scale(' + s + ')';
+      function baseHeight() {
+        const n = natural();
+        return (n.ih / n.iw) * stage.clientWidth;
+      }
+
+      function boundsFor(s) {
+        const sw = stage.clientWidth;
+        const sh = stage.clientHeight;
+        const h = baseHeight() * s;
+        if (h <= sh) {
+          const center = Math.round((sh - h) / 2);
+          return { minX: 0, maxX: 0, minY: center, maxY: center };
+        }
+        return { minX: sw - sw * s, maxX: 0, minY: Math.round(sh - h), maxY: 0 };
+      }
+
+      function clampPos() {
+        const b = boundsFor(scale);
+        tx = clamp(tx, b.minX, b.maxX);
+        ty = clamp(ty, b.minY, b.maxY);
+      }
+
+      function paint() {
+        img.style.transform = 'translate3d(' + tx + 'px,' + ty + 'px,0) scale(' + scale + ')';
+      }
+
+      function zoomAt(factor, px, py) {
+        const s = clamp(scale * factor, MIN_S, MAX_S);
+        if (s === scale) return;
+        const wx = (px - tx) / scale;
+        const wy = (py - ty) / scale;
+        tx = px - wx * s;
+        ty = py - wy * s;
+        scale = s;
+        clampPos();
       }
 
       // Fit to screen, then zoom-in from 0.94 centered on the stage center.
       function ready() {
         clearTimeout(settleTimer);
-        const sw = stage.clientWidth;
-        const sh = stage.clientHeight;
-        computeFit();
-        const cs = scale * 0.94;
+        const sw = stage.clientWidth, sh = stage.clientHeight;
+        scale = 1; tx = 0; ty = 0;
+        if (baseHeight() <= sh) ty = Math.round((sh - baseHeight()) / 2);
+        const cs = 0.94;
         const cx = sw / 2, cy = sh / 2;
-        paint(cx - (cs / scale) * (cx - tx), cy - (cs / scale) * (cy - ty), cs);
-        img.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+        img.style.transition = 'none';
+        img.style.transform =
+          'translate3d(' + (cx - (cx - tx) * cs).toFixed(1) + 'px,' + (cy - (cy - ty) * cs).toFixed(1) + 'px,0) scale(' + cs + ')';
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => paint(tx, ty, scale));
+          img.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+          requestAnimationFrame(() => paint());
         });
         settleTimer = setTimeout(() => { img.style.transition = 'none'; }, 460);
       }
@@ -1547,13 +1569,16 @@
       function fit() {
         clearTimeout(settleTimer);
         img.style.transition = 'none';
-        computeFit();
-        paint(tx, ty, scale);
+        scale = 1; tx = 0; ty = 0;
+        if (baseHeight() <= stage.clientHeight) ty = Math.round((stage.clientHeight - baseHeight()) / 2);
+        paint();
       }
 
       function open(src, alt) {
         img.alt = alt || '';
         img.src = src;
+        pointers.clear();
+        drag = null; pinch = null;
         img.style.transition = 'none';
         img.style.transform = 'none';
         modal.classList.add('open');
@@ -1567,31 +1592,62 @@
         modal.classList.remove('open');
         modal.setAttribute('aria-hidden', 'true');
         document.body.classList.remove('modal-open');
-        dragging = false;
+        pointers.clear();
+        drag = null; pinch = null;
+      }
+
+      function anchorDrag() {
+        const p = pointers.values().next().value;
+        drag = { id: p.id, x: p.x, y: p.y, tx: tx, ty: ty };
       }
 
       stage.addEventListener('pointerdown', (e) => {
         if (e.target === stage) { close(); return; }
-        if (!canPan) return;
         clearTimeout(settleTimer);
         img.style.transition = 'none';
-        dragging = true;
-        sx = e.clientX; sy = e.clientY; stx = tx; sty = ty;
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
         try { stage.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+        if (pointers.size === 1) {
+          anchorDrag();
+          pinch = null;
+        } else if (pointers.size === 2) {
+          const [a, b] = Array.from(pointers.values());
+          pinch = { prevDist: Math.hypot(a.x - b.x, a.y - b.y) };
+          drag = null;
+        }
       });
 
       stage.addEventListener('pointermove', (e) => {
-        if (!dragging) return;
-        const dx = e.clientX - sx;
-        const dy = e.clientY - sy;
-        tx = clamp(stx + dx, minX, maxX);
-        ty = clamp(sty + dy, minY, maxY);
-        paint(tx, ty, scale);
+        if (!pointers.has(e.pointerId)) return;
+        pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        if (pointers.size === 2) {
+          const [a, b] = Array.from(pointers.values());
+          const dist = Math.hypot(a.x - b.x, a.y - b.y);
+          const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+          if (pinch && pinch.prevDist > 0) zoomAt(dist / pinch.prevDist, mx, my);
+          pinch = { prevDist: dist };
+          paint();
+          return;
+        }
+
+        if (pointers.size === 1 && drag && drag.id === e.pointerId) {
+          const b = boundsFor(scale);
+          tx = clamp(drag.tx + (e.clientX - drag.x), b.minX, b.maxX);
+          ty = clamp(drag.ty + (e.clientY - drag.y), b.minY, b.maxY);
+          paint();
+        }
       });
 
-      const endDrag = () => { dragging = false; };
-      stage.addEventListener('pointerup', endDrag);
-      stage.addEventListener('pointercancel', endDrag);
+      function endPointer(e) {
+        pointers.delete(e.pointerId);
+        pinch = null;
+        if (pointers.size === 1) anchorDrag();
+        else drag = null;
+      }
+      stage.addEventListener('pointerup', endPointer);
+      stage.addEventListener('pointercancel', endPointer);
+      stage.addEventListener('gesturestart', (e) => e.preventDefault());
 
       closeBtn.addEventListener('click', close);
       document.addEventListener('keydown', (e) => {
@@ -1624,11 +1680,20 @@
       prevY = y;
     }, { passive: true });
 
+    /* ─── Desktop-only notice (OS + mobile) ─── */
+    const isMobile = window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(max-width: 760px)').matches;
+
+    function showDesktopNotice() {
+      const alert = document.getElementById('osAlert');
+      if (!alert) return;
+      alert.style.display = 'flex';
+      try { alert.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (err) { /* noop */ }
+    }
+
     /* ─── OS detection ─── */
     const ua = (navigator.userAgentData?.platform || navigator.platform || navigator.userAgent).toUpperCase();
-    if (ua.indexOf('WIN') === -1) {
-      const alert = document.getElementById('osAlert');
-      if (alert) alert.style.display = 'flex';
+    if (ua.indexOf('WIN') === -1 && !isMobile) {
+      showDesktopNotice();
       const hero = document.getElementById('heroDl');
       if (hero) hero.lastChild.textContent = ' Download Installer Anyway';
     }
@@ -1637,7 +1702,13 @@
     const toast = document.getElementById('toast');
     let hideTimer;
     document.querySelectorAll('.dl').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', (e) => {
+        // Phones/tablets: block navigation to the release URL and show a notice instead.
+        if (isMobile) {
+          e.preventDefault();
+          showDesktopNotice();
+          return;
+        }
         clearTimeout(hideTimer);
         setTimeout(() => toast.classList.add('show'), 700);
         hideTimer = setTimeout(() => toast.classList.remove('show'), 14000);
