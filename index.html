@@ -864,6 +864,69 @@
       from { opacity: 0; transform: translateY(12px) scale(0.99); } 
       to { opacity: 1; transform: translateY(0) scale(1); } 
     }
+
+    /* Mobile lightbox — pan-drag diagram viewer */
+    .deploy-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: none;
+      background: rgba(8, 12, 18, 0.92);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      touch-action: none;
+    }
+    .deploy-modal.open { display: block; }
+    .deploy-modal-stage {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .deploy-modal img {
+      position: absolute;
+      left: 0;
+      top: 0;
+      transform-origin: 0 0;
+      will-change: transform;
+      user-select: none;
+      -webkit-user-drag: none;
+      touch-action: none;
+      border-radius: 2px;
+    }
+    .deploy-modal-close {
+      position: absolute;
+      top: calc(14px + env(safe-area-inset-top));
+      right: 14px;
+      z-index: 2;
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.14);
+      color: #fff;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+    }
+    .deploy-modal-hint {
+      position: absolute;
+      bottom: calc(16px + env(safe-area-inset-bottom));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2;
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 0.76rem;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.14);
+      pointer-events: none;
+    }
+    body.modal-open { overflow: hidden; }
+
+    @media (max-width: 760px) {
+      .deploy-card img { cursor: zoom-in; -webkit-tap-highlight-color: transparent; }
+    }
     /* ───────── Footer ───────── */
     footer {
       border-top: 1px solid var(--line);
@@ -1231,6 +1294,17 @@
     </div>
   </section>
 
+    <!-- Mobile lightbox — pannable layout diagram viewer (mobile only) -->
+    <div class="deploy-modal" id="deployModal" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="deploy-modal-stage" id="deployModalStage">
+        <button class="deploy-modal-close" id="deployModalClose" aria-label="Close diagram">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+        <img src="" alt="">
+        <div class="deploy-modal-hint">Drag to pan</div>
+      </div>
+    </div>
+
   <!-- ══════ SPECS ══════ -->
   <section class="section" id="specs">
     <div class="container">
@@ -1379,6 +1453,104 @@
         document.getElementById(targetId).classList.add('active');
       });
     });
+
+    /* ─── Mobile lightbox: pan-drag diagram viewer (mobile only) ─── */
+    (function initDeployModal() {
+      'use strict';
+
+      const mq = window.matchMedia('(max-width: 760px)');
+      const modal = document.getElementById('deployModal');
+      const stage = document.getElementById('deployModalStage');
+      const closeBtn = document.getElementById('deployModalClose');
+      const img = modal.querySelector('img');
+      if (!modal || !stage || !closeBtn || !img) return;
+
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      let scale = 1, tx = 0, ty = 0, minX = 0, maxX = 0, minY = 0, maxY = 0;
+      let canPan = false, dragging = false, sx = 0, sy = 0, stx = 0, sty = 0;
+      let bound = false;
+
+      function fit() {
+        const iw = img.naturalWidth || 1536;
+        const ih = img.naturalHeight || 1024;
+        const sw = stage.clientWidth;
+        const sh = stage.clientHeight;
+        scale = sw / iw;
+        const dispH = ih * scale;
+        tx = 0; ty = 0;
+        img.style.width = iw + 'px';
+        img.style.height = ih + 'px';
+        if (dispH <= sh) {
+          canPan = false;
+          minY = maxY = ty = Math.max(0, Math.round((sh - dispH) / 2));
+          minX = maxX = tx = Math.max(0, Math.round((sw - dispH * (iw / ih)) / 2));
+        } else {
+          canPan = true;
+          if (iw >= sw) { minX = maxX = 0; }
+          else { minX = Math.max(0, (sw - dispH * (iw / ih)) / 2); maxX = minX === 0 ? 0 : minX; }
+          minY = sh - dispH;
+          maxY = 0;
+        }
+        paint();
+      }
+
+      function paint() {
+        img.style.transform = 'translate3d(' + tx + 'px,' + ty + 'px,0) scale(' + scale + ')';
+      }
+
+      function open(src, alt) {
+        img.src = src;
+        img.alt = alt || '';
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+        if (img.complete && img.naturalWidth) fit();
+        else img.addEventListener('load', fit, { once: true });
+      }
+
+      function close() {
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('modal-open');
+        dragging = false;
+      }
+
+      stage.addEventListener('pointerdown', (e) => {
+        if (e.target === stage) { close(); return; }
+        if (!canPan) return;
+        dragging = true;
+        sx = e.clientX; sy = e.clientY; stx = tx; sty = ty;
+        try { stage.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
+      });
+
+      stage.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const dx = e.clientX - sx;
+        const dy = e.clientY - sy;
+        tx = clamp(stx + dx, minX, maxX);
+        ty = clamp(sty + dy, minY, maxY);
+        paint();
+      });
+
+      const endDrag = () => { dragging = false; };
+      stage.addEventListener('pointerup', endDrag);
+      stage.addEventListener('pointercancel', endDrag);
+
+      closeBtn.addEventListener('click', close);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('open')) close();
+      });
+
+      function bindIfMobile() {
+        if (bound || !mq.matches) return;
+        bound = true;
+        document.querySelectorAll('.deploy-content img').forEach((el) => {
+          el.addEventListener('click', () => open(el.src, el.alt));
+        });
+      }
+      if (mq.addEventListener) mq.addEventListener('change', bindIfMobile);
+      bindIfMobile();
+    })();
 
     /* ─── Nav auto-hide ─── */
     const nav = document.getElementById('nav');
