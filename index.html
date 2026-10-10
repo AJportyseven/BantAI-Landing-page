@@ -1,0 +1,1667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BantAI — Offline AI-Assisted Classroom Assessment Security Console</title>
+  <meta name="description" content="BantAI is an offline, AI-assisted classroom assessment monitoring support console. Human-in-the-loop governance, zero biometrics, fully air-gapped.">
+  <link rel="icon" type="image/png" href="assets/bantaillogo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --surface: #F7F8FA;
+      --surface-2: #FFFFFF;
+      --cyan: #93f7ff;
+      --cyan-deep: #00b4c8;
+      --cyan-dark: #007a8a;
+      --cyan-dim: #0097A1;
+      --green: #1D9E75;
+      --amber: #BA7517;
+      --red: #A32D2D;
+      --text: #1A1D26;
+      --muted: #5B6072;
+      --dim: #8A91A3;
+      --line: rgba(17, 24, 39, 0.08);
+      --line-accent: rgba(147, 247, 255, 0.25);
+      --sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+      --r: 18px;
+      --r-sm: 12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; background: var(--bg); }
+
+    body {
+      background: transparent;
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.65;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    ::selection { background: rgba(147, 247, 255, 0.25); color: #1A1D26; }
+
+    img { max-width: 100%; display: block; }
+
+    /* ══════════════════════════════════
+       Light Blobs + Subtle Grid
+       Accent: #93f7ff
+    ══════════════════════════════════ */
+    #fx-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      overflow: hidden;
+      background:
+        radial-gradient(1000px 600px at 15% -10%, rgba(147, 247, 255, 0.14), transparent 60%),
+        radial-gradient(800px 500px at 90% 5%, rgba(0, 180, 200, 0.10), transparent 55%),
+        linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 50%, #F3F9FA 100%);
+    }
+
+    body { background: transparent; }
+
+    /* subtle grid */
+    .fx-grid {
+      position: absolute;
+      inset: -10%;
+      background-image:
+        linear-gradient(rgba(15, 23, 42, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.045) 1px, transparent 1px);
+      background-size: 56px 56px;
+      transform: translate3d(var(--gx, 0px), var(--gy, 0px), 0);
+      mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+      -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
+      will-change: transform;
+    }
+
+    /* blobs */
+    .fx-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      will-change: transform;
+      transform:
+        translate3d(var(--x, 0px), var(--y, 0px), 0)
+        scale(var(--s, 1), var(--sy, 1));
+      opacity: 1;
+    }
+
+    .fx-a {
+      width: 64vmax;
+      height: 64vmax;
+      left: -14%;
+      top: -18%;
+      background: radial-gradient(circle,
+        rgba(147, 247, 255, 0.72) 0%,
+        rgba(147, 247, 255, 0.32) 42%,
+        transparent 74%);
+    }
+
+    .fx-b {
+      width: 56vmax;
+      height: 56vmax;
+      right: -12%;
+      top: 12%;
+      background: radial-gradient(circle,
+        rgba(0, 180, 200, 0.60) 0%,
+        rgba(0, 122, 138, 0.28) 46%,
+        transparent 76%);
+    }
+
+    .fx-c {
+      width: 50vmax;
+      height: 50vmax;
+      left: 30%;
+      bottom: -20%;
+      background: radial-gradient(circle,
+        rgba(147, 247, 255, 0.46) 0%,
+        rgba(226, 232, 240, 0.55) 48%,
+        transparent 76%);
+    }
+
+    /* mouse spotlight */
+    .fx-spot {
+      position: absolute;
+      width: 50vmax;
+      height: 50vmax;
+      left: 0;
+      top: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle,
+        rgba(147, 247, 255, 0.48) 0%,
+        rgba(147, 247, 255, 0.20) 40%,
+        transparent 72%);
+      transform: translate3d(-50%, -50%, 0) translate3d(var(--sx, 50vw), var(--sy, 40vh), 0);
+      filter: blur(10px);
+      will-change: transform;
+      opacity: 0.9;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .fx-blob, .fx-spot, .fx-grid { transform: none !important; }
+    }
+
+    /* ─── Minimal Preloader (logo + type only) ─── */
+    #preloader {
+      position: fixed;
+      inset: 0;
+      z-index: 99999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #FFFFFF;
+      transition: opacity 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+                  visibility 0.55s step-end;
+    }
+    #preloader.is-done {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .preloader-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.4rem;
+    }
+    .preloader-logo {
+      width: 84px;
+      height: 84px;
+      object-fit: contain;
+      opacity: 0;
+      transform: translateY(8px) scale(0.96);
+      animation: preLogoIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.05s forwards;
+    }
+    .preloader-type {
+      display: inline-flex;
+      align-items: baseline;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 2.2rem;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #1A1D26;
+      line-height: 1;
+    }
+    .preloader-type .typed-char {
+      opacity: 0;
+      display: inline-block;
+      transform: translateY(6px);
+    }
+    .preloader-type .typed-char.is-in {
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .preloader-type .typed-char:nth-child(5),
+    .preloader-type .typed-char:nth-child(6) {
+      color: #93f7ff; /* AI in brand cyan */
+    }
+    @keyframes preLogoIn {
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ─── Hero character animation ─── */
+    .hero-title {
+      font-size: clamp(1.75rem, 8vw, 5.8rem);
+      font-weight: 500;
+      letter-spacing: -0.045em;
+      line-height: 1.15;
+      margin-bottom: 1.5rem;
+      color: #0B0E14;
+      max-width: none;
+    }
+    .hero-title .line {
+      display: block;
+      white-space: nowrap;
+    }
+    .hero-title .word {
+      display: inline-block;
+      white-space: nowrap;
+      margin-right: 0.28em;
+    }
+    .hero-title .ch {
+      display: inline-block;
+      opacity: 0;
+      transform: translateY(0.55em) rotateX(25deg);
+      filter: blur(6px);
+      will-change: transform, opacity, filter;
+    }
+    .hero-title .ch.is-in {
+      opacity: 1;
+      transform: none;
+      filter: none;
+      transition:
+        opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.55s cubic-bezier(0.16, 1, 0.3, 1),
+        filter 0.55s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .hero-title .grad-word .ch {
+      background: linear-gradient(140deg, #93f7ff 0%, #00BFCB 55%, #0097A1 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    /* Hero supporting lines fade-up after type */
+    .hero-status,
+    .hero .lead,
+    .hero-ctas {
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .hero.is-live .hero-status,
+    .hero.is-live .lead,
+    .hero.is-live .hero-ctas {
+      opacity: 1;
+      transform: none;
+    }
+    .hero.is-live .lead { transition-delay: 0.05s; }
+    .hero.is-live .hero-ctas { transition-delay: 0.12s; }
+
+    /* Make glass navbar play nicely with luminous bg */
+    .navbar {
+      background: rgba(255,255,255,0.80) !important;
+      backdrop-filter: blur(18px) saturate(1.12);
+      -webkit-backdrop-filter: blur(18px) saturate(1.12);
+      border: 1px solid rgba(17, 24, 39, 0.08);
+      box-shadow: 0 10px 30px -12px rgba(17, 24, 39, 0.10);
+    }
+
+    /* Cards remain solid so content stays crisp above glow */
+    .card,
+    .step,
+    .preset,
+    .specs,
+    .deploy-content,
+    .toast {
+      background: #FFFFFF;
+    }
+
+    @media (max-width: 860px) {
+      .hero-title { max-width: none; }
+      .preloader-type { font-size: 1.8rem; }
+    }
+
+    /* ───────── Navigation ───────── */
+    .nav-wrapper {
+      position: fixed; top: 18px; left: 0; right: 0;
+      display: flex; justify-content: center;
+      z-index: 1000; padding: 0 1.25rem;
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+    }
+    .nav-wrapper.hidden { transform: translateY(-130%); opacity: 0; }
+
+    /* Nav and hero chrome stay hidden until the intro animation completes */
+    body:not(.site-live) .nav-wrapper {
+      opacity: 0;
+      transform: translateY(-20px);
+      pointer-events: none;
+    }
+
+    .navbar {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1.5rem;
+      width: 100%; max-width: 1060px;
+      padding: 0.65rem 0.75rem 0.65rem 1.4rem;
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(18px) saturate(1.15);
+      -webkit-backdrop-filter: blur(18px) saturate(1.15);
+      border: 1px solid rgba(17, 24, 39, 0.08);
+      border-radius: 999px;
+      box-shadow: 0 10px 30px -12px rgba(17, 24, 39, 0.10);
+    }
+
+    .brand {
+      display: flex; align-items: center; gap: 0.6rem;
+      text-decoration: none; flex-shrink: 0;
+    }
+    .brand img { width: 28px; height: 28px; object-fit: contain; }
+    .brand-title {
+      font-size: 1.22rem; font-weight: 800;
+      color: #1A1D26; letter-spacing: -0.03em; line-height: 1;
+    }
+    .brand-title span { color: var(--cyan); }
+
+    .nav-links {
+      display: flex; align-items: center; gap: 2rem;
+      list-style: none; margin: 0 auto;
+    }
+    .nav-links a {
+      position: relative;
+      color: var(--muted); text-decoration: none;
+      font-size: 0.875rem; font-weight: 500;
+      transition: color 0.2s ease;
+      white-space: nowrap;
+    }
+    .nav-links a::after {
+      content: ''; position: absolute;
+      left: 0; bottom: -5px;
+      width: 0; height: 1.5px;
+      background: var(--cyan);
+      transition: width 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-links a:hover::after { width: 100%; }
+
+    .btn-nav {
+      display: inline-flex; align-items: center; gap: 0.45rem;
+      padding: 0.6rem 1.25rem;
+      background: #1A1D26; color: #FFFFFF;
+      font-weight: 600; font-size: 0.84rem;
+      border-radius: 999px; text-decoration: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      flex-shrink: 0; white-space: nowrap;
+    }
+    .btn-nav:hover {
+      background: var(--cyan);
+      color: #0B2A2E;
+      box-shadow: 0 6px 20px rgba(147, 247, 255, 0.35);
+      transform: translateY(-1px);
+    }
+
+    /* ───────── Layout ───────── */
+    .section { padding: 7rem 0; }
+    .container { width: min(1180px, 90vw); margin-inline: auto; }
+    .container-sm { width: min(860px, 90vw); margin-inline: auto; }
+
+
+
+    /* ───────── Hero ───────── */
+    .hero {
+      min-height: 100svh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center;
+      padding: clamp(7.5rem, 15vh, 10rem) 0 clamp(4.5rem, 9vh, 6.5rem);
+    }
+
+    .hero-status {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      font-family: var(--mono); font-size: 0.75rem; font-weight: 500;
+      color: var(--dim); letter-spacing: 0.03em;
+      margin-bottom: 1.75rem;
+    }
+    .hero-status .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
+      animation: blink 2.2s ease-in-out infinite;
+    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+    .hero h1 {
+      font-size: clamp(1.75rem, 8vw, 5.8rem);
+      font-weight: 500;
+      letter-spacing: -0.045em;
+      line-height: 1.12;
+      margin-bottom: clamp(1.5rem, 3.5vh, 2.25rem);
+      color: #0B0E14;
+      max-width: none;
+    }
+    .hero h1 .grad {
+      background: linear-gradient(135deg, #1A1D26 15%, var(--cyan) 100%);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero p.lead {
+      font-size: clamp(1rem, 1.9vw, 1.2rem);
+      color: var(--muted);
+      max-width: 620px;
+      line-height: 1.7;
+      text-wrap: balance;
+      margin-bottom: clamp(2.25rem, 5vh, 3.25rem);
+    }
+
+    .hero-ctas {
+      display: flex; gap: 1rem;
+      flex-wrap: wrap; justify-content: center;
+      margin-bottom: clamp(2.5rem, 6vh, 4rem);
+    }
+
+    .btn-primary {
+      position: relative; overflow: hidden;
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.65rem;
+      padding: 1rem 2.1rem;
+      background: var(--cyan); color: #0B2A2E;
+      font-size: 1rem; font-weight: 600;
+      border: 1px solid var(--cyan);
+      border-radius: var(--r-sm);
+      text-decoration: none;
+      box-shadow: 0 6px 24px rgba(147, 247, 255, 0.28);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      min-width: 250px;
+    }
+    .btn-primary::before {
+      content: ''; position: absolute; inset: 0 auto 0 -100%;
+      width: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+      transition: left 0.6s ease;
+    }
+    .btn-primary:hover::before { left: 100%; }
+    .btn-primary:hover {
+      background: #6FDCEC;
+      border-color: #6FDCEC;
+      transform: translateY(-2px);
+      box-shadow: 0 14px 36px rgba(147, 247, 255, 0.4);
+    }
+
+    .btn-ghost {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem;
+      padding: 1rem 2.1rem;
+      background: #FFFFFF;
+      color: #1A1D26; font-size: 1rem; font-weight: 600;
+      border: 1px solid var(--line);
+      border-radius: var(--r-sm);
+      text-decoration: none;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      min-width: 250px;
+    }
+    .btn-ghost:hover {
+      background: #F7F8FA;
+      border-color: rgba(17, 24, 39, 0.18);
+      transform: translateY(-2px);
+    }
+
+    .os-alert {
+      display: none;
+      align-items: flex-start; gap: 0.7rem;
+      width: 100%; max-width: 620px;
+      margin-top: 2rem; padding: 0.85rem 1.15rem;
+      background: rgba(245, 158, 11, 0.06);
+      border: 1px solid rgba(245, 158, 11, 0.22);
+      border-radius: 10px;
+      color: var(--amber); font-size: 0.82rem;
+      text-align: left; line-height: 1.5;
+    }
+    .os-alert svg { flex-shrink: 0; margin-top: 2px; }
+
+    /* ───────── Section Header ───────── */
+    .sec-head { text-align: center; max-width: 680px; margin: 0 auto 4rem; }
+    .sec-head h2 {
+      font-size: clamp(1.9rem, 4.2vw, 2.65rem);
+      font-weight: 600; letter-spacing: -0.035em;
+      line-height: 1.15; margin-bottom: 0.9rem;
+      color: #0B0E14;
+    }
+    .sec-head p {
+      color: var(--muted);
+      font-size: clamp(0.95rem, 1.8vw, 1.08rem);
+      line-height: 1.65;
+    }
+
+    /* ───────── Pipeline ───────── */
+    .pipeline {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1.25rem;
+    }
+    .step {
+      position: relative; overflow: hidden;
+      display: flex; flex-direction: column;
+      background: #FFFFFF;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      padding: 2rem 1.6rem;
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .step::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, var(--cyan), transparent);
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    .step:hover { border-color: var(--line-accent); transform: translateY(-4px); }
+    .step:hover::before { opacity: 1; }
+
+    .step-icon { color: var(--cyan-dark); opacity: 1; margin-bottom: 1.15rem; }
+    .step h3 { font-size: 1.02rem; font-weight: 600; color: #1A1D26; margin-bottom: 0.5rem; letter-spacing: -0.01em; }
+    .step p { font-size: 0.855rem; color: var(--muted); line-height: 1.6; }
+
+    /* ───────── Bento Grid ───────── */
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 1.25rem;
+    }
+    .card {
+      position: relative; overflow: hidden;
+      display: flex; flex-direction: column; gap: 1rem;
+      background: #FFFFFF;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      padding: 2.25rem;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                  border-color 0.3s ease, box-shadow 0.4s ease;
+    }
+    .card::after {
+      content: ''; position: absolute; inset: 0;
+      border-radius: var(--r); pointer-events: none;
+      background: radial-gradient(500px circle at var(--mx, 50%) var(--my, 50%),
+                  rgba(147, 247, 255, 0.08), transparent 45%);
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    .card:hover::after { opacity: 1; }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: var(--line-accent);
+      box-shadow: 0 20px 40px -18px rgba(147, 247, 255, 0.18);
+    }
+
+    .span-4 { grid-column: span 4; }
+    .span-3 { grid-column: span 3; }
+    .span-2 { grid-column: span 2; }
+    .span-6 { grid-column: span 6; }
+
+    .card-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 46px; height: 46px; flex-shrink: 0;
+      background: rgba(147, 247, 255, 0.06);
+      border: 1px solid var(--line-accent);
+      border-radius: 11px;
+      color: var(--cyan-dark);
+    }
+    .card h3 { font-size: 1.22rem; font-weight: 600; color: #1A1D26; letter-spacing: -0.02em; line-height: 1.3; }
+    .card p { font-size: 0.91rem; color: var(--muted); line-height: 1.65; }
+
+    .checklist { list-style: none; margin-top: 0.35rem; }
+    .checklist li {
+      display: flex; align-items: flex-start; gap: 0.65rem;
+      padding: 0.55rem 0;
+      font-size: 0.86rem; color: var(--muted); line-height: 1.55;
+      border-bottom: 1px solid rgba(17, 24, 39, 0.06);
+    }
+    .checklist li:last-child { border-bottom: 0; padding-bottom: 0; }
+    .checklist li svg { flex-shrink: 0; margin-top: 3px; color: var(--cyan-dark); opacity: 0.85; }
+
+    .stamp {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      align-self: flex-start; margin-top: auto;
+      padding: 0.35rem 0.7rem;
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.22);
+      border-radius: 6px;
+      color: var(--green);
+      font-size: 0.68rem; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+
+    /* ───────── Presets ───────── */
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1.25rem;
+    }
+    .preset {
+      display: flex; flex-direction: column;
+      text-align: center;
+      background: #FFFFFF;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      padding: 2.25rem 1.75rem;
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .preset:hover { transform: translateY(-4px); border-color: var(--line-accent); }
+    .preset.active {
+      border-color: rgba(147, 247, 255, 0.45);
+      background: #FFFFFF;
+      box-shadow: 0 12px 40px -18px rgba(147, 247, 255, 0.45);
+    }
+    .preset-tag {
+      font-size: 0.66rem; font-weight: 600;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      margin-bottom: 0.8rem;
+    }
+    .preset:nth-child(1) .preset-tag { color: var(--red); }
+    .preset:nth-child(2) .preset-tag { color: var(--cyan); }
+    .preset:nth-child(3) .preset-tag { color: var(--green); }
+    .preset h3 { font-size: 1.3rem; font-weight: 600; color: #1A1D26; margin-bottom: 0.6rem; letter-spacing: -0.02em; }
+    .preset p { font-size: 0.86rem; color: var(--muted); line-height: 1.6; }
+
+    /* ───────── Specs Table ───────── */
+    .specs {
+      background: #FFFFFF;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      overflow: hidden;
+      box-shadow: 0 10px 30px -18px rgba(17, 24, 39, 0.12);
+    }
+    table { width: 100%; border-collapse: collapse; }
+    th, td {
+      padding: 1.25rem 1.65rem;
+      text-align: left; font-size: 0.89rem;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+    th {
+      background: #F7F8FA;
+      color: var(--cyan-dark);
+      font-size: 0.72rem; font-weight: 600;
+      letter-spacing: 0.12em; text-transform: uppercase;
+    }
+    tbody tr { transition: background 0.22s ease; }
+    tbody tr:hover td { background: rgba(147, 247, 255, 0.035); }
+    tbody tr:last-child td { border-bottom: 0; }
+    td strong { color: #1A1D26; font-weight: 600; }
+    td { color: var(--muted); }
+    .tag {
+      display: inline-block;
+      margin-left: 0.5rem; padding: 0.15rem 0.5rem;
+      background: #F7F8FA;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      font-family: var(--mono); font-size: 0.68rem;
+      color: var(--muted);
+    }
+
+    /* ───────── CTA ───────── */
+    .cta {
+      text-align: center;
+      padding: 7rem 0;
+      border-top: 1px solid var(--line);
+      background: radial-gradient(ellipse 60% 100% at 50% 100%, rgba(147, 247, 255, 0.08), transparent 65%);
+    }
+    .cta h2 {
+      font-size: clamp(1.8rem, 4vw, 2.45rem);
+      font-weight: 600; letter-spacing: -0.035em;
+      margin-bottom: 1rem;
+    }
+    .cta p {
+      color: var(--muted); font-size: 1.03rem;
+      max-width: 540px; margin: 0 auto 2.5rem;
+      line-height: 1.65;
+    }
+
+    /* ───────── Toast (FIXED LAYOUT) ───────── */
+    .toast {
+      position: fixed;
+      right: 20px; bottom: 20px;
+      width: min(380px, calc(100vw - 40px));
+      background: #FFFFFF;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 24px 55px -14px rgba(17, 24, 39, 0.22);
+      z-index: 9999;
+      opacity: 0;
+      transform: translateY(24px) scale(0.97);
+      pointer-events: none;
+      transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: none;
+      pointer-events: auto;
+    }
+
+    .toast-top {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--line);
+      background: rgba(147, 247, 255, 0.06);
+    }
+    .toast-top svg.lead-icon { flex-shrink: 0; color: var(--cyan-dark); }
+    .toast-top h4 {
+      flex: 1; min-width: 0;
+      font-size: 0.92rem; font-weight: 600; color: #1A1D26;
+      letter-spacing: -0.01em;
+    }
+    .toast-x {
+      flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px;
+      background: transparent; border: 0;
+      border-radius: 6px;
+      color: var(--dim); cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .toast-x:hover { background: #F0F2F5; color: #1A1D26; }
+
+    .toast-body { padding: 1.1rem 1.25rem 1.25rem; }
+    .toast-body > p {
+      font-size: 0.83rem; color: var(--muted);
+      line-height: 1.6; margin-bottom: 0.9rem;
+    }
+    .toast-hint {
+      display: flex; flex-direction: column; gap: 0.55rem;
+      padding: 0.85rem 0.95rem;
+      background: #F7F8FA;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+    }
+    .toast-hint-row {
+      display: flex; align-items: flex-start; gap: 0.6rem;
+      font-size: 0.8rem; color: var(--muted); line-height: 1.5;
+    }
+    .toast-hint-row .n {
+      flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 17px; height: 17px; margin-top: 1px;
+      background: rgba(147, 247, 255, 0.12);
+      border-radius: 50%;
+      font-family: var(--mono); font-size: 0.63rem; font-weight: 600;
+      color: var(--cyan-dark);
+    }
+    .toast-hint-row strong { color: #1A1D26; font-weight: 600; }
+
+    /* ───────── Responsive ───────── */
+    @media (max-width: 1024px) {
+      .pipeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .span-4, .span-3, .span-2 { grid-column: span 6; }
+    }
+
+    @media (max-width: 860px) {
+      .nav-links { display: none; }
+      .navbar { justify-content: space-between; }
+      .section { padding: 5rem 0; }
+      .cta { padding: 5rem 0; }
+      .presets { grid-template-columns: 1fr; }
+      .card { padding: 1.9rem; }
+      .sec-head { margin-bottom: 3rem; }
+      .btn-primary, .btn-ghost { width: 100%; max-width: 340px; }
+      .hero-ctas { width: 100%; }
+
+      /* Stacked table */
+      thead { display: none; }
+      tbody tr { display: block; padding: 1.25rem 1.35rem; border-bottom: 1px solid var(--line); }
+      tbody tr:last-child { border-bottom: 0; }
+      td { display: block; padding: 0; border: 0; }
+      td:nth-child(1) { font-size: 1rem; margin-bottom: 0.75rem; }
+      td:nth-child(2)::before { content: 'Minimum — '; color: var(--dim); font-size: 0.76rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+      td:nth-child(3)::before { content: 'Recommended — '; color: var(--cyan-dim); font-size: 0.76rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+      td:nth-child(2) { margin-bottom: 0.4rem; }
+    }
+
+    @media (max-width: 560px) {
+      .pipeline { grid-template-columns: 1fr; }
+      .hero { padding-top: 7.5rem; }
+      .toast { right: 12px; bottom: 12px; width: calc(100vw - 24px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition-duration: 0.01ms !important; }
+    }
+
+    /* ───────── Deployment Tabs ───────── */
+    .deploy-tabs {
+      display: flex; justify-content: center; flex-wrap: wrap;
+      gap: 0.75rem; margin-bottom: 2.5rem;
+    }
+    .tab-btn {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.75rem 1.75rem;
+      background: #FFFFFF;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      font-family: var(--sans); font-size: 0.92rem; font-weight: 600;
+      cursor: pointer; transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .tab-btn svg { width: 18px; height: 18px; opacity: 0.7; }
+    .tab-btn:hover { 
+      background: #F7F8FA; color: var(--text); 
+      border-color: rgba(17, 24, 39, 0.15);
+      transform: translateY(-1px);
+    }
+    .tab-btn.active {
+      background: var(--cyan); border-color: var(--cyan); color: #0B2A2E;
+      box-shadow: 0 6px 20px rgba(147, 247, 255, 0.25);
+    }
+    .tab-btn.active svg { opacity: 1; }
+    
+    .deploy-content {
+      background: #FFFFFF;
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      padding: 1.5rem;
+      box-shadow: 0 16px 40px -15px rgba(17, 24, 39, 0.08);
+      max-width: 1000px; margin: 0 auto;
+    }
+    .deploy-card { display: none; animation: tabFade 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    .deploy-card.active { display: block; }
+    .deploy-card img {
+      width: 100%; height: auto; 
+      border-radius: var(--r-sm);
+      border: 1px solid rgba(17, 24, 39, 0.05);
+      display: block;
+    }
+    @keyframes tabFade { 
+      from { opacity: 0; transform: translateY(12px) scale(0.99); } 
+      to { opacity: 1; transform: translateY(0) scale(1); } 
+    }
+    /* ───────── Footer ───────── */
+    footer {
+      border-top: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.88);
+      padding: 3.5rem 0 2rem;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr 1.4fr;
+      gap: 2rem;
+      text-align: left;
+      padding-bottom: 2rem;
+    }
+
+    .footer-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #1A1D26;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+
+    .footer-desc { color: var(--muted); line-height: 1.6; max-width: 28ch; }
+
+    .footer-heading {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cyan-dark);
+      margin-bottom: 0.8rem;
+    }
+
+    .footer-col p { margin-bottom: 0.55rem; line-height: 1.6; }
+
+    .footer-link {
+      color: var(--cyan-dark);
+      text-decoration: none;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(0, 122, 138, 0.3);
+      transition: color 0.2s ease, border-color 0.2s ease;
+    }
+    .footer-link:hover {
+      color: #00606d;
+      border-bottom-color: rgba(0, 96, 109, 0.55);
+    }
+
+    .footer-legal { font-size: 0.80rem; color: var(--dim); }
+
+    .footer-bottom {
+      border-top: 1px solid var(--line);
+      padding-top: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      text-align: center;
+      color: var(--dim);
+      font-size: 0.80rem;
+    }
+
+    .footer-note { opacity: 0.9; }
+
+    @media (max-width: 860px) {
+      .footer-grid {
+        grid-template-columns: 1fr;
+        gap: 1.6rem;
+        text-align: left;
+      }
+      .footer-desc { max-width: none; }
+    }
+
+    /* ═══════════════════════════════════════════
+       SCROLL MOTION — scroll-linked fade + glide
+       Reacts to scroll up AND down; rAF-driven.
+       opacity/translate only — compositor-friendly, no layout.
+    ═══════════════════════════════════════════ */
+    html.js [data-scr] {
+      opacity: 0;
+      translate: 0 18px;
+    }
+    html.js.reduce-motion [data-scr] {
+      opacity: 1;
+      translate: 0 0;
+    }
+
+  </style>
+</head>
+<body>
+
+  <div id="preloader" aria-hidden="false">
+    <div class="preloader-inner">
+      <img src="assets/bantaillogo.png" alt="" class="preloader-logo" width="84" height="84">
+      <div class="preloader-type" aria-label="BantAI">
+        <span class="typed-char">B</span>
+        <span class="typed-char">a</span>
+        <span class="typed-char">n</span>
+        <span class="typed-char">t</span>
+        <span class="typed-char">A</span>
+        <span class="typed-char">I</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="fx-bg" aria-hidden="true">
+    <div class="fx-grid"></div>
+    <div class="fx-blob fx-a"></div>
+    <div class="fx-blob fx-b"></div>
+    <div class="fx-blob fx-c"></div>
+    <div class="fx-spot"></div>
+  </div>
+
+  <!-- ══════ NAV ══════ -->
+  <div class="nav-wrapper" id="nav">
+    <nav class="navbar">
+      <a href="#top" class="brand">
+        <img src="assets/bantaillogo.png" alt="BantAI">
+        <span class="brand-title">Bant<span>AI</span></span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#how">How It Works</a></li>
+        <li><a href="#features">Features</a></li>
+        <li><a href="#presets">Tuning</a></li>
+        <li><a href="#specs">Requirements</a></li>
+      </ul>
+      <a href="/BantAI_Setup_v1.0.exe" download="BantAI_Setup_v1.0.exe" class="btn-nav dl">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download
+      </a>
+    </nav>
+  </div>
+
+  <!-- ══════ HERO ══════ -->
+  <header class="hero container" id="top">
+    <h1 class="hero-title reveal-hero" id="heroTitle">
+      <span class="line">
+        <span class="word"><span class="ch">P</span><span class="ch">r</span><span class="ch">o</span><span class="ch">t</span><span class="ch">e</span><span class="ch">c</span><span class="ch">t</span><span class="ch">i</span><span class="ch">n</span><span class="ch">g</span></span>
+        <span class="word"><span class="ch">h</span><span class="ch">o</span><span class="ch">n</span><span class="ch">e</span><span class="ch">s</span><span class="ch">t</span></span>
+        <span class="word"><span class="ch">e</span><span class="ch">f</span><span class="ch">f</span><span class="ch">o</span><span class="ch">r</span><span class="ch">t</span><span class="ch">.</span></span>
+      </span>
+      <span class="line">
+        <span class="word"><span class="ch">E</span><span class="ch">m</span><span class="ch">p</span><span class="ch">o</span><span class="ch">w</span><span class="ch">e</span><span class="ch">r</span><span class="ch">i</span><span class="ch">n</span><span class="ch">g</span></span>
+        <span class="word grad-word"><span class="ch">p</span><span class="ch">r</span><span class="ch">o</span><span class="ch">c</span><span class="ch">t</span><span class="ch">o</span><span class="ch">r</span><span class="ch">s</span><span class="ch">.</span></span>
+      </span>
+    </h1>
+
+    <p class="lead">
+      Offline, AI-assisted monitoring for exam rooms. BantAI surfaces evidence while every final judgment stays with the proctor.
+    </p>
+
+    <div class="hero-ctas">
+      <a href="/BantAI_Setup_v1.0.exe" download="BantAI_Setup_v1.0.exe" class="btn-primary dl" id="heroDl">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download for Windows
+      </a>
+    </div>
+
+    <div class="os-alert" id="osAlert">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span>BantAI is built for Windows x64 systems. You can still download the installer and transfer it to a compatible machine.</span>
+    </div>
+  </header>
+
+  <!-- ══════ HOW IT WORKS ══════ -->
+  <section class="section" id="how">
+    <div class="container">
+      <div class="sec-head">
+        <h2>How BantAI Works</h2>
+        <p>A four-stage pipeline from raw camera input to proctor-validated decisions — all executed locally.</p>
+      </div>
+
+      <div class="pipeline">
+        <article class="step">
+          <span class="step-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </span>
+          <h3>Camera Acquisition</h3>
+          <p>Acquires frames from local USB UVC webcams or RTSP IP cameras with TCP-preferred fallback. Entirely offline.</p>
+        </article>
+
+        <article class="step">
+          <span class="step-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="12" r="3"/></svg>
+          </span>
+          <h3>Coarse-to-Fine Analysis</h3>
+          <p>Downscaled whole-room pass via YOLOv8n, then crop-and-recheck at full resolution to suppress false positives.</p>
+        </article>
+
+        <article class="step">
+          <span class="step-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+          </span>
+          <h3>Evidence Persistence</h3>
+          <p>Single watermarked JPEG snapshots written at flag time. No continuous recording. Auto-purged on schedule.</p>
+        </article>
+
+        <article class="step">
+          <span class="step-icon">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </span>
+          <h3>Human Decision</h3>
+          <p>Flags surface on the proctor dashboard. Confirm, dismiss, or annotate — every decision is audit-logged.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ FEATURES ══════ -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="sec-head">
+        <h2>Engineered for Real Classrooms</h2>
+        <p>Privacy-compliant, CPU-optimized architecture purpose-built for commodity institutional hardware.</p>
+      </div>
+
+      <div class="bento">
+
+        <article class="card span-4">
+          <span class="card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </span>
+          <h3>Human-in-the-Loop Governance</h3>
+          <p>BantAI operates strictly as a decision-support console. It flags observable anomalies — sustained head turns, prohibited items, unusual movement — and surfaces watermarked evidence to the proctor dashboard.</p>
+          <ul class="checklist">
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              No automated accusations or penalties — every flag requires human review
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Confirm, dismiss, or annotate each incident with proctor notes
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Dismissal accountability — reviewer identity and timestamp always recorded
+            </li>
+          </ul>
+        </article>
+
+        <article class="card span-2">
+          <span class="card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </span>
+          <h3>Privacy-by-Design</h3>
+          <p>100% air-gapped on-premises execution. Zero facial recognition or biometric matching. Zero audio capture. No continuous video storage — only single-frame evidence at flag time.</p>
+          <span class="stamp">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            RA 10173 Compliant
+          </span>
+        </article>
+
+        <article class="card span-3">
+          <span class="card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>
+          </span>
+          <h3>Multi-Student Tracking</h3>
+          <p>ByteTrack maintains persistent track IDs for up to 40–45 students simultaneously. A 5-second Spatial Memory Rebinding window recovers lost tracks through temporary occlusion — no class roster required.</p>
+        </article>
+
+        <article class="card span-3">
+          <span class="card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </span>
+          <h3>3-Tier Pose Estimation</h3>
+          <p>Cascading geometric head-turn detection: Tier 1 ear–nose yaw, Tier 2 eye–nose fallback, Tier 3 profile geometry under heavy occlusion. Robust across desks, arms, and partial visibility.</p>
+        </article>
+
+        <article class="card span-4">
+          <span class="card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </span>
+          <h3>Institutional PDF Reporting</h3>
+          <p>Generates official, print-ready Final Incident Reports with institutional branding, embedded watermarked snapshots, proctor annotations, and Guidance Office disclaimer blocks.</p>
+          <ul class="checklist">
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Exports confirmed incidents only — pending and dismissed events excluded
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Session timestamps, paused duration, and proctor identity embedded
+            </li>
+            <li>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Accommodation transparency — applied overrides disclosed per student
+            </li>
+          </ul>
+        </article>
+
+        <article class="card span-2">
+          <span class="card-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+          </span>
+          <h3>Dedicated Workspaces</h3>
+          <p>Live Session, Sessions archive, Incidents inspector, Reports, Settings, and Replay Library — each a full workspace with master-detail navigation and a dual light/dark theme.</p>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ PRESETS ══════ -->
+  <section class="section" id="presets">
+    <div class="container">
+      <div class="sec-head">
+        <h2>Sensitivity Presets</h2>
+        <p>Three built-in presets balance detection sensitivity against false positive suppression. Custom sliders are available in Settings.</p>
+      </div>
+
+      <div class="presets">
+        <article class="preset">
+          <span class="preset-tag">Higher Alert Volume</span>
+          <h3>Strict</h3>
+          <p>Shortest head-turn duration threshold and lowest movement magnitude. Designed for high-integrity controlled environments.</p>
+        </article>
+
+        <article class="preset active">
+          <span class="preset-tag">Default Preset</span>
+          <h3>Balanced</h3>
+          <p>Moderate duration and movement thresholds. Tuned for typical Philippine classroom conditions and general exam use.</p>
+        </article>
+
+        <article class="preset">
+          <span class="preset-tag">Reduced Alerts</span>
+          <h3>Lenient</h3>
+          <p>Longest duration threshold and highest movement magnitude. Suited for accommodative contexts with lower alert volume.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ DEPLOYMENT LAYOUT ══════ -->
+  <section class="section" id="deployment">
+    <div class="container">
+      <div class="sec-head">
+        <h2>Physical Deployment Layout</h2>
+        <p>BantAI supports flexible camera configurations depending on your classroom's constraints. Optimal placement ensures high-confidence pose estimation.</p>
+      </div>
+
+      <div class="deploy-tabs">
+        <button class="tab-btn active" data-target="rtsp-img">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.75 12h3.632a1 1 0 0 1 .894 1.447l-2.034 4.069a1 1 0 0 1-1.708.134l-2.124-2.97"/><path d="M17.106 9.053a1 1 0 0 1 .447 1.341l-3.106 6.211a1 1 0 0 1-1.342.447L3.61 12.3a2.92 2.92 0 0 1-1.3-3.91L3.69 5.6a2.92 2.92 0 0 1 3.91-1.3z"/><path d="M2 21h5"/></svg>
+          RTSP Ceiling Mount
+        </button>
+        <button class="tab-btn" data-target="usb-img">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          USB Tripod Mount
+        </button>
+      </div>
+
+      <div class="deploy-content">
+        <div class="deploy-card active" id="rtsp-img">
+          <img src="assets/rtsp-layout.png" alt="RTSP Wi-Fi Camera Ceiling Mount Layout Diagram">
+        </div>
+        <div class="deploy-card" id="usb-img">
+          <img src="assets/usb-layout.png" alt="USB Webcam Height-Adjustable Tripod Layout Diagram">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ SPECS ══════ -->
+  <section class="section" id="specs">
+    <div class="container">
+      <div class="sec-head">
+        <h2>System Requirements</h2>
+        <p>Engineered to run efficiently on standard institutional hardware — no GPU required.</p>
+      </div>
+
+      <div class="specs">
+        <table>
+          <thead>
+            <tr>
+              <th>Component</th>
+              <th>Minimum</th>
+              <th>Recommended</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Operating System</strong></td>
+              <td>Windows 10 64-bit<span class="tag">v1809+</span></td>
+              <td>Windows 10 / 11 64-bit</td>
+            </tr>
+            <tr>
+              <td><strong>Processor</strong></td>
+              <td>x86_64 Dual-Core @ 2.0 GHz<span class="tag">SSE4.2 / AVX</span></td>
+              <td>x86_64 Quad-Core @ 2.5 GHz+<span class="tag">AVX2</span></td>
+            </tr>
+            <tr>
+              <td><strong>Memory</strong></td>
+              <td>4 GB RAM</td>
+              <td>8 GB RAM or higher</td>
+            </tr>
+            <tr>
+              <td><strong>Storage</strong></td>
+              <td>2 GB free<span class="tag">NTFS / FAT32</span></td>
+              <td>5 GB free<span class="tag">SSD</span></td>
+            </tr>
+            <tr>
+              <td><strong>Display</strong></td>
+              <td>1280 × 720 (HD)</td>
+              <td>1920 × 1080 (Full HD)</td>
+            </tr>
+            <tr>
+              <td><strong>Camera</strong></td>
+              <td>720p USB 2.0 UVC @ 30 FPS</td>
+              <td>1080p USB 3.0 or RTSP IP camera</td>
+            </tr>
+            <tr>
+              <td><strong>Network</strong></td>
+              <td>Fully offline<span class="tag">Air-Gapped</span></td>
+              <td>Fully offline<span class="tag">Air-Gapped</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ CTA ══════ -->
+  <section class="cta">
+    <div class="container-sm">
+      <h2>Ready to support your exam room?</h2>
+      <p>Download BantAI and give your proctors a monitoring support tool that stays offline, private, and fully under their control.</p>
+      <a href="/BantAI_Setup_v1.0.exe" download="BantAI_Setup_v1.0.exe" class="btn-primary dl">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download for Windows
+      </a>
+    </div>
+  </section>
+
+  <!-- ══════ TOAST ══════ -->
+  <aside class="toast" id="toast" role="status" aria-live="polite">
+    <div class="toast-top">
+      <svg class="lead-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <h4>Download Started</h4>
+      <button class="toast-x" id="toastClose" aria-label="Close notification">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="toast-body">
+      <p>If Windows SmartScreen appears during installation, follow these steps:</p>
+      <div class="toast-hint">
+        <div class="toast-hint-row">
+          <span class="n">1</span>
+          <span>Click <strong>More info</strong> on the "Windows protected your PC" dialog.</span>
+        </div>
+        <div class="toast-hint-row">
+          <span class="n">2</span>
+          <span>Select <strong>Run anyway</strong> to continue the installation.</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ══════ FOOTER ══════ -->
+  <footer>
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <div class="footer-title">BantAI</div>
+        <p class="footer-desc">Offline AI-assisted classroom assessment monitoring support console.</p>
+      </div>
+
+      <div class="footer-col">
+        <div class="footer-heading">Contact</div>
+        <p>Portfolio:</p>
+        <a class="footer-link" href="https://ajdomingo.cu.ma" target="_blank" rel="noopener noreferrer">ajdomingo.cu.ma</a>
+      </div>
+
+      <div class="footer-col">
+        <div class="footer-heading">Open Source Notices</div>
+        <p class="footer-legal">
+          Detection and pose estimation are powered by <strong>YOLOv8n</strong> and <strong>YOLOv8-Pose</strong>
+          from <strong>Ultralytics YOLO</strong>, distributed under the
+          <a class="footer-link" href="https://www.gnu.org/licenses/agpl-3.0.txt" target="_blank" rel="noopener noreferrer">GNU Affero General Public License v3.0 (AGPL-3.0)</a>.
+        </p>
+        <p class="footer-legal">
+          Source: <a class="footer-link" href="https://github.com/ultralytics/ultralytics" target="_blank" rel="noopener noreferrer">github.com/ultralytics/ultralytics</a>
+        </p>
+      </div>
+    </div>
+
+    <div class="container footer-bottom">
+      <p>© 2026 AJ Domingo. All rights reserved.</p>
+      <p class="footer-note">BantAI is an assistive proctoring support tool. Final decisions remain with human proctors.</p>
+    </div>
+  </footer>
+
+  <script>
+  (function () {
+    'use strict';
+
+    /* ─── Deployment Tabs ─── */
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabCards = document.querySelectorAll('.deploy-card');
+    
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        // Remove active class from all
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabCards.forEach(c => c.classList.remove('active'));
+        
+        // Add active class to clicked button and target card
+        btn.classList.add('active');
+        const targetId = btn.getAttribute('data-target');
+        document.getElementById(targetId).classList.add('active');
+      });
+    });
+
+    /* ─── Nav auto-hide ─── */
+    const nav = document.getElementById('nav');
+    let prevY = 0;
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY;
+      nav.classList.toggle('hidden', y > prevY && y > 140);
+      prevY = y;
+    }, { passive: true });
+
+    /* ─── OS detection ─── */
+    const ua = (navigator.userAgentData?.platform || navigator.platform || navigator.userAgent).toUpperCase();
+    if (ua.indexOf('WIN') === -1) {
+      const alert = document.getElementById('osAlert');
+      if (alert) alert.style.display = 'flex';
+      const hero = document.getElementById('heroDl');
+      if (hero) hero.lastChild.textContent = ' Download Installer Anyway';
+    }
+
+    /* ─── Download toast ─── */
+    const toast = document.getElementById('toast');
+    let hideTimer;
+    document.querySelectorAll('.dl').forEach(btn => {
+      btn.addEventListener('click', () => {
+        clearTimeout(hideTimer);
+        setTimeout(() => toast.classList.add('show'), 700);
+        hideTimer = setTimeout(() => toast.classList.remove('show'), 14000);
+      });
+    });
+    document.getElementById('toastClose').addEventListener('click', () => {
+      clearTimeout(hideTimer);
+      toast.classList.remove('show');
+    });
+
+    /* ─── Card cursor glow ─── */
+    document.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('pointermove', e => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+        card.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+      });
+    });
+
+    /* ─── Preloader + Hero type ─── */
+    (function initExperience() {
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const preloader = document.getElementById('preloader');
+      const hero = document.querySelector('.hero');
+      const chars = Array.from(document.querySelectorAll('#heroTitle .ch'));
+      const preChars = Array.from(document.querySelectorAll('.preloader-type .typed-char'));
+
+      function typePreloader() {
+        return new Promise((resolve) => {
+          if (reduce) {
+            preChars.forEach(c => c.classList.add('is-in'));
+            setTimeout(resolve, 250);
+            return;
+          }
+          preChars.forEach((c, i) => {
+            setTimeout(() => c.classList.add('is-in'), 180 + i * 70);
+          });
+          // hold a beat after typing
+          setTimeout(resolve, 180 + preChars.length * 70 + 420);
+        });
+      }
+
+      function hidePreloader() {
+        return new Promise((resolve) => {
+          if (!preloader) return resolve();
+          preloader.classList.add('is-done');
+          preloader.setAttribute('aria-hidden', 'true');
+          setTimeout(resolve, 560);
+        });
+      }
+
+      function typeHero() {
+        if (!hero) return;
+        if (reduce) {
+          chars.forEach(c => c.classList.add('is-in'));
+          hero.classList.add('is-live');
+          document.body.classList.add('site-live');
+          return;
+        }
+        chars.forEach((c, i) => {
+          setTimeout(() => c.classList.add('is-in'), i * 28);
+        });
+        const doneIn = chars.length * 28 + 300;
+        setTimeout(() => {
+          hero.classList.add('is-live');
+          document.body.classList.add('site-live');
+        }, doneIn);
+      }
+
+      // Safety: never block the page if anything fails
+      setTimeout(() => {
+        if (preloader && !preloader.classList.contains('is-done')) {
+          preloader.classList.add('is-done');
+          preloader.setAttribute('aria-hidden', 'true');
+          if (hero) hero.classList.add('is-live');
+          document.body.classList.add('site-live');
+          chars.forEach(c => c.classList.add('is-in'));
+        }
+      }, 3200);
+
+      // Boot sequence
+      (async function boot() {
+        await typePreloader();
+        await hidePreloader();
+        typeHero();
+      })();
+    })();
+
+    /* ════════════════════════════════════════════
+       BantAI — Light Blob Distortion + Scroll
+       Accent #93f7ff
+    ════════════════════════════════════════════ */
+    (function initLightBlobs() {
+      'use strict';
+
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const root = document.getElementById('fx-bg');
+      if (!root || reduce) return;
+
+      const a = root.querySelector('.fx-a');
+      const b = root.querySelector('.fx-b');
+      const c = root.querySelector('.fx-c');
+      const spot = root.querySelector('.fx-spot');
+      const grid = root.querySelector('.fx-grid');
+
+      let mx = 0.5, my = 0.45;   // smoothed 0..1
+      let tx = 0.5, ty = 0.45;   // target
+      let sp = 0, tsp = 0;       // scroll 0..1
+      let lastMove = performance.now();
+      let idle = true;
+      let t = 0;
+
+      const lerp = (x, y, k) => x + (y - x) * k;
+
+      function setBlob(el, x, y, sx, sy) {
+        if (!el) return;
+        el.style.setProperty('--x', x.toFixed(2) + 'px');
+        el.style.setProperty('--y', y.toFixed(2) + 'px');
+        el.style.setProperty('--s', sx.toFixed(3));
+        el.style.setProperty('--sy', sy.toFixed(3));
+      }
+
+      function onMove(e) {
+        tx = e.clientX / window.innerWidth;
+        ty = e.clientY / window.innerHeight;
+        lastMove = performance.now();
+        idle = false;
+      }
+
+      function onScroll() {
+        const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+        tsp = window.scrollY / max;
+      }
+
+      function frame(now) {
+        t = now * 0.001;
+        idle = (now - lastMove) > 1200;
+
+        mx = lerp(mx, tx, 0.08);
+        my = lerp(my, ty, 0.08);
+        sp = lerp(sp, tsp, 0.06);
+
+        // idle drift
+        const driftX = idle ? Math.sin(t * 0.35) * 0.03 : 0;
+        const driftY = idle ? Math.cos(t * 0.28) * 0.025 : 0;
+
+        const px = mx + driftX;
+        const py = my + driftY;
+
+        // mouse distortion (stretch toward cursor)
+        const dx = (px - 0.5);
+        const dy = (py - 0.5);
+
+        // stronger stretch near cursor movement
+        const stretch = idle ? 0.04 : 0.12;
+        const breath = 1 + Math.sin(t * (idle ? 0.7 : 1.2)) * (idle ? 0.03 : 0.02);
+
+        // Blob A
+        setBlob(
+          a,
+          dx * 70 + sp * -25,
+          dy * 45 + sp * 35 + Math.sin(t * 0.5) * 8,
+          (1 + dx * stretch) * breath,
+          (1 - dx * stretch * 0.6) * breath
+        );
+
+        // Blob B
+        setBlob(
+          b,
+          dx * -90 + sp * 30,
+          dy * 55 + sp * 18 + Math.cos(t * 0.4) * 10,
+          (1 - dx * stretch * 0.8) * breath,
+          (1 + dy * stretch * 0.5) * breath
+        );
+
+        // Blob C
+        setBlob(
+          c,
+          dx * 55 + sp * -15,
+          dy * -70 + sp * 80 + Math.sin(t * 0.45) * 12,
+          (1 + dy * stretch * 0.5) * breath,
+          (1 + dx * stretch * 0.4) * breath
+        );
+
+        // spotlight follows mouse
+        if (spot) {
+          spot.style.setProperty('--sx', (px * window.innerWidth).toFixed(2) + 'px');
+          spot.style.setProperty('--sy', (py * window.innerHeight).toFixed(2) + 'px');
+          spot.style.opacity = idle ? '0.7' : '0.95';
+        }
+
+        // grid parallax on mouse + scroll
+        if (grid) {
+          const gx = dx * -18 + sp * 12;
+          const gy = dy * -14 + sp * 40;
+          grid.style.setProperty('--gx', gx.toFixed(2) + 'px');
+          grid.style.setProperty('--gy', gy.toFixed(2) + 'px');
+        }
+
+        requestAnimationFrame(frame);
+      }
+
+      window.addEventListener('pointermove', onMove, { passive: true });
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll, { passive: true });
+
+      onScroll();
+      requestAnimationFrame(frame);
+    })();
+
+    /* ═══════════════════════════════════════════
+       BantAI — Scroll Motion
+       Scroll-linked fade + glide — reacts to scroll up AND down.
+       One passive scroll listener + a single rAF loop; opacity/translate only.
+    ═══════════════════════════════════════════ */
+    (function initScrollMotion() {
+      'use strict';
+
+      const html = document.documentElement;
+      html.classList.add('js');
+
+      // Tag every content block that should react to scroll.
+      const targets = [];
+      document.querySelectorAll('.section, .cta').forEach(el => targets.push(el));
+
+      [['.pipeline', '.step'], ['.bento', '.card'], ['.presets', '.preset']].forEach(pair => {
+        document.querySelectorAll(pair[0] + ' > ' + pair[1]).forEach((el, i) => {
+          el.dataset.scr = String(i * 130);
+          targets.push(el);
+        });
+      });
+
+      document.querySelectorAll('.specs, .deploy-tabs').forEach(el => {
+        el.dataset.scr = '0';
+        targets.push(el);
+      });
+
+      const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduce) {
+        html.classList.add('reduce-motion');
+        targets.forEach(el => {
+          el.style.opacity = '1';
+          el.style.translate = 'none';
+        });
+        return;
+      }
+
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+      function update() {
+        const vh = window.innerHeight || 800;
+        const mid = vh / 2;
+        targets.forEach(el => {
+          const r = el.getBoundingClientRect();
+          const h = r.height || 1;
+          const c = r.top + h / 2 + (parseInt(el.dataset.scr, 10) || 0);
+          const half = mid + h / 2;
+          const dist = Math.abs(c - mid);
+          const u = clamp(1 - dist / half, 0, 1);
+          const o = clamp(0.2 + 0.8 * u, 0, 1);
+          const y = clamp(dist * 0.12, 0, 26) * (c < mid ? -1 : 1);
+
+          if (Math.abs(o - (el._so || 0)) > 0.02 || Math.abs(y - (el._sy || 0)) > 0.6) {
+            el._so = o;
+            el._sy = y;
+            el.style.opacity = o >= 1 ? '1' : String(o);
+            el.style.translate = y ? '0 ' + y.toFixed(1) + 'px' : 'none';
+          }
+        });
+      }
+
+      let queued = false;
+      const onScroll = () => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(() => { queued = false; update(); });
+      };
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+      window.addEventListener('resize', onScroll);
+      window.addEventListener('load', onScroll);
+
+      try { update(); }
+      catch (err) {
+        targets.forEach(el => { el.style.opacity = '1'; el.style.translate = 'none'; });
+      }
+    })();
+
+  })();
+  </script>
