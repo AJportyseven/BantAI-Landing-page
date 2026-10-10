@@ -37,6 +37,23 @@
 
     html { scroll-behavior: smooth; background: var(--bg); }
 
+    /* Custom scrollbar — slim, rounded, cyan-tinted */
+    html {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 122, 138, 0.55) var(--surface);
+    }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: var(--surface); }
+    ::-webkit-scrollbar-thumb {
+      background: linear-gradient(180deg, rgba(147, 247, 255, 0.85), rgba(0, 180, 200, 0.55));
+      border-radius: 999px;
+      border: 2px solid var(--surface);
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, rgba(0, 151, 161, 0.9), rgba(0, 122, 138, 0.75));
+    }
+    ::-webkit-scrollbar-corner { background: transparent; }
+
     body {
       background: transparent;
       color: var(--text);
