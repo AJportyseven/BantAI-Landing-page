@@ -870,29 +870,43 @@
       position: fixed;
       inset: 0;
       z-index: 2000;
-      display: none;
       background: rgba(8, 12, 18, 0.92);
       backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px);
       touch-action: none;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 0.28s ease, visibility 0s linear 0.28s;
     }
-    .deploy-modal.open { display: block; }
+    .deploy-modal.open {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+      transition: opacity 0.28s ease;
+    }
     .deploy-modal-stage {
       position: relative;
       width: 100%;
       height: 100vh;
       overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .deploy-modal img {
       position: absolute;
       left: 0;
       top: 0;
+      width: 100%;
+      height: auto;
       transform-origin: 0 0;
       will-change: transform;
       user-select: none;
       -webkit-user-drag: none;
       touch-action: none;
-      border-radius: 2px;
+      border-radius: 4px;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .deploy-modal-close {
       position: absolute;
@@ -1468,44 +1482,68 @@
       const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
       let scale = 1, tx = 0, ty = 0, minX = 0, maxX = 0, minY = 0, maxY = 0;
       let canPan = false, dragging = false, sx = 0, sy = 0, stx = 0, sty = 0;
-      let bound = false;
+      let bound = false, settleTimer = null;
 
-      function fit() {
+      function computeFit() {
         const iw = img.naturalWidth || 1536;
         const ih = img.naturalHeight || 1024;
         const sw = stage.clientWidth;
         const sh = stage.clientHeight;
-        scale = sw / iw;
-        const dispH = ih * scale;
+        // CSS renders the image at width:100% (aspect kept) — transform is translate-only.
+        const dispH = ih * (sw / iw);
+        scale = 1;
         tx = 0; ty = 0;
-        img.style.width = iw + 'px';
-        img.style.height = ih + 'px';
         if (dispH <= sh) {
           canPan = false;
-          minY = maxY = ty = Math.max(0, Math.round((sh - dispH) / 2));
-          minX = maxX = tx = Math.max(0, Math.round((sw - dispH * (iw / ih)) / 2));
+          minX = maxX = tx = 0;
+          minY = maxY = ty = Math.round(Math.max(0, (sh - dispH) / 2));
         } else {
           canPan = true;
-          if (iw >= sw) { minX = maxX = 0; }
-          else { minX = Math.max(0, (sw - dispH * (iw / ih)) / 2); maxX = minX === 0 ? 0 : minX; }
-          minY = sh - dispH;
+          minX = maxX = 0;
+          minY = Math.round(sh - dispH);
           maxY = 0;
         }
-        paint();
+        return { iw: iw, ih: ih };
       }
 
-      function paint() {
-        img.style.transform = 'translate3d(' + tx + 'px,' + ty + 'px,0) scale(' + scale + ')';
+      function paint(x, y, s) {
+        img.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0) scale(' + s + ')';
+      }
+
+      // Fit to screen, then zoom-in from 0.94 centered on the stage center.
+      function ready() {
+        clearTimeout(settleTimer);
+        const sw = stage.clientWidth;
+        const sh = stage.clientHeight;
+        computeFit();
+        const cs = scale * 0.94;
+        const cx = sw / 2, cy = sh / 2;
+        paint(cx - (cs / scale) * (cx - tx), cy - (cs / scale) * (cy - ty), cs);
+        img.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => paint(tx, ty, scale));
+        });
+        settleTimer = setTimeout(() => { img.style.transition = 'none'; }, 460);
+      }
+
+      // No animation — used on rotate/resize while open.
+      function fit() {
+        clearTimeout(settleTimer);
+        img.style.transition = 'none';
+        computeFit();
+        paint(tx, ty, scale);
       }
 
       function open(src, alt) {
-        img.src = src;
         img.alt = alt || '';
+        img.src = src;
+        img.style.transition = 'none';
+        img.style.transform = 'none';
         modal.classList.add('open');
         modal.setAttribute('aria-hidden', 'false');
         document.body.classList.add('modal-open');
-        if (img.complete && img.naturalWidth) fit();
-        else img.addEventListener('load', fit, { once: true });
+        if (img.complete && img.naturalWidth) ready();
+        else img.addEventListener('load', ready, { once: true });
       }
 
       function close() {
@@ -1518,6 +1556,8 @@
       stage.addEventListener('pointerdown', (e) => {
         if (e.target === stage) { close(); return; }
         if (!canPan) return;
+        clearTimeout(settleTimer);
+        img.style.transition = 'none';
         dragging = true;
         sx = e.clientX; sy = e.clientY; stx = tx; sty = ty;
         try { stage.setPointerCapture(e.pointerId); } catch (err) { /* noop */ }
@@ -1529,7 +1569,7 @@
         const dy = e.clientY - sy;
         tx = clamp(stx + dx, minX, maxX);
         ty = clamp(sty + dy, minY, maxY);
-        paint();
+        paint(tx, ty, scale);
       });
 
       const endDrag = () => { dragging = false; };
@@ -1539,6 +1579,12 @@
       closeBtn.addEventListener('click', close);
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && modal.classList.contains('open')) close();
+      });
+      window.addEventListener('orientationchange', () => {
+        if (modal.classList.contains('open')) setTimeout(fit, 250);
+      });
+      window.addEventListener('resize', () => {
+        if (modal.classList.contains('open')) fit();
       });
 
       function bindIfMobile() {
