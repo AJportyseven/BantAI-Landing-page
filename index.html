@@ -69,30 +69,24 @@
 
     body { background: transparent; }
 
-    /* subtle grid */
+    /* subtle grid — static, composited once */
     .fx-grid {
       position: absolute;
       inset: -10%;
       background-image:
-        linear-gradient(rgba(15, 23, 42, 0.045) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(15, 23, 42, 0.045) 1px, transparent 1px);
+        linear-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.04) 1px, transparent 1px);
       background-size: 56px 56px;
-      transform: translate3d(var(--gx, 0px), var(--gy, 0px), 0);
-      mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
-      -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 80%);
-      will-change: transform;
+      mask-image: radial-gradient(ellipse at center, #000 28%, transparent 82%);
+      -webkit-mask-image: radial-gradient(ellipse at center, #000 28%, transparent 82%);
     }
 
-    /* blobs */
+    /* blobs — drift & breathe via compositor keyframes (no JS, no repaint) */
     .fx-blob {
       position: absolute;
       border-radius: 50%;
       filter: blur(60px);
       will-change: transform;
-      transform:
-        translate3d(var(--x, 0px), var(--y, 0px), 0)
-        scale(var(--s, 1), var(--sy, 1));
-      opacity: 1;
     }
 
     .fx-a {
@@ -104,6 +98,11 @@
         rgba(147, 247, 255, 0.72) 0%,
         rgba(147, 247, 255, 0.32) 42%,
         transparent 74%);
+      animation: blobADrift 16s ease-in-out infinite alternate;
+    }
+    @keyframes blobADrift {
+      from { transform: translate3d(0, 0, 0) scale(1); }
+      to   { transform: translate3d(4vmax, 3vmax, 0) scale(1.06); }
     }
 
     .fx-b {
@@ -115,6 +114,11 @@
         rgba(0, 180, 200, 0.60) 0%,
         rgba(0, 122, 138, 0.28) 46%,
         transparent 76%);
+      animation: blobBDrift 20s ease-in-out infinite alternate;
+    }
+    @keyframes blobBDrift {
+      from { transform: translate3d(0, 0, 0) scale(1); }
+      to   { transform: translate3d(-3.5vmax, 2.5vmax, 0) scale(1.05); }
     }
 
     .fx-c {
@@ -126,9 +130,14 @@
         rgba(147, 247, 255, 0.46) 0%,
         rgba(226, 232, 240, 0.55) 48%,
         transparent 76%);
+      animation: blobCDrift 24s ease-in-out infinite alternate;
+    }
+    @keyframes blobCDrift {
+      from { transform: translate3d(0, 0, 0) scale(1); }
+      to   { transform: translate3d(3vmax, -2.5vmax, 0) scale(1.08); }
     }
 
-    /* mouse spotlight */
+    /* mouse spotlight — JS moves it only while the pointer moves */
     .fx-spot {
       position: absolute;
       width: 50vmax;
@@ -140,14 +149,29 @@
         rgba(147, 247, 255, 0.48) 0%,
         rgba(147, 247, 255, 0.20) 40%,
         transparent 72%);
-      transform: translate3d(-50%, -50%, 0) translate3d(var(--sx, 50vw), var(--sy, 40vh), 0);
+      transform: translate3d(-50%, -50%, 0);
       filter: blur(10px);
       will-change: transform;
       opacity: 0.9;
     }
 
+    /* mobile: small dim accents hugging the edges — never a mid-screen blob */
+    @media (max-width: 760px) {
+      #fx-bg .fx-blob { filter: blur(34px); }
+      .fx-a { width: 70vmin; height: 70vmin; left: -28%; top: -16%; opacity: 0.5; }
+      .fx-b { width: 60vmin; height: 60vmin; right: -26%; top: 34%; opacity: 0.38; }
+      .fx-c { width: 66vmin; height: 66vmin; left: 46%; bottom: -24%; opacity: 0.4; }
+      .fx-spot { display: none; }
+      .fx-grid {
+        background-size: 44px 44px;
+        background-image:
+          linear-gradient(rgba(15, 23, 42, 0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px);
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      .fx-blob, .fx-spot, .fx-grid { transform: none !important; }
+      .fx-blob, .fx-spot, .fx-grid { animation: none !important; transform: none !important; }
     }
 
     /* ─── Minimal Preloader (logo + type only) ─── */
@@ -915,15 +939,19 @@
     }
 
     /* ═══════════════════════════════════════════
-       SCROLL MOTION — scroll-linked fade + glide
-       Reacts to scroll up AND down; rAF-driven.
-       opacity/translate only — compositor-friendly, no layout.
+       SCROLL MOTION — reveal on scroll-down only
+       Elements animate in once when entering from below,
+       then stay revealed (no effect when scrolling back up).
     ═══════════════════════════════════════════ */
-    html.js [data-scr] {
+    html.js [data-reveal] {
       opacity: 0;
-      translate: 0 18px;
+      translate: 0 22px;
+      transition:
+        opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+        translate 0.9s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    html.js.reduce-motion [data-scr] {
+    html.js [data-reveal].is-in,
+    html.js.reduce-motion [data-reveal] {
       opacity: 1;
       translate: 0 0;
     }
@@ -1464,203 +1492,84 @@
     })();
 
     /* ════════════════════════════════════════════
-       BantAI — Light Blob Distortion + Scroll
-       Accent #93f7ff
+       BantAI — Light Blob Background
+       Blobs/grid drift via CSS keyframes (compositor).
+       JS only nudges the spotlight while the pointer moves —
+       no perpetual animation loop, no per-frame CSS vars.
     ════════════════════════════════════════════ */
     (function initLightBlobs() {
       'use strict';
 
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       const root = document.getElementById('fx-bg');
-      if (!root || reduce) return;
+      const spot = root && root.querySelector('.fx-spot');
+      // Desktop-only cursor spotlight (no mouse on touch devices).
+      if (!spot || reduce || window.matchMedia('(pointer: coarse)').matches) return;
+      if (window.innerWidth < 760) return;
 
-      const a = root.querySelector('.fx-a');
-      const b = root.querySelector('.fx-b');
-      const c = root.querySelector('.fx-c');
-      const spot = root.querySelector('.fx-spot');
-      const grid = root.querySelector('.fx-grid');
+      let px = 0.5, py = 0.4;
+      let raf = null;
 
-      let mx = 0.5, my = 0.45;   // smoothed 0..1
-      let tx = 0.5, ty = 0.45;   // target
-      let sp = 0, tsp = 0;       // scroll 0..1
-      let lastMove = performance.now();
-      let idle = true;
-      let t = 0;
+      const target = (e) => {
+        px = e.clientX / window.innerWidth;
+        py = e.clientY / window.innerHeight;
+        if (raf) return;
+        raf = requestAnimationFrame(() => {
+          raf = null;
+          spot.style.transform =
+            'translate3d(-50%, -50%, 0) translate3d(' +
+            (px * 100).toFixed(2) + 'vw, ' + (py * 100).toFixed(2) + 'vh, 0)';
+        });
+      };
 
-      const lerp = (x, y, k) => x + (y - x) * k;
-
-      function setBlob(el, x, y, sx, sy) {
-        if (!el) return;
-        el.style.setProperty('--x', x.toFixed(2) + 'px');
-        el.style.setProperty('--y', y.toFixed(2) + 'px');
-        el.style.setProperty('--s', sx.toFixed(3));
-        el.style.setProperty('--sy', sy.toFixed(3));
-      }
-
-      function onMove(e) {
-        tx = e.clientX / window.innerWidth;
-        ty = e.clientY / window.innerHeight;
-        lastMove = performance.now();
-        idle = false;
-      }
-
-      function onScroll() {
-        const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
-        tsp = window.scrollY / max;
-      }
-
-      function frame(now) {
-        t = now * 0.001;
-        idle = (now - lastMove) > 1200;
-
-        mx = lerp(mx, tx, 0.08);
-        my = lerp(my, ty, 0.08);
-        sp = lerp(sp, tsp, 0.06);
-
-        // idle drift
-        const driftX = idle ? Math.sin(t * 0.35) * 0.03 : 0;
-        const driftY = idle ? Math.cos(t * 0.28) * 0.025 : 0;
-
-        const px = mx + driftX;
-        const py = my + driftY;
-
-        // mouse distortion (stretch toward cursor)
-        const dx = (px - 0.5);
-        const dy = (py - 0.5);
-
-        // stronger stretch near cursor movement
-        const stretch = idle ? 0.04 : 0.12;
-        const breath = 1 + Math.sin(t * (idle ? 0.7 : 1.2)) * (idle ? 0.03 : 0.02);
-
-        // Blob A
-        setBlob(
-          a,
-          dx * 70 + sp * -25,
-          dy * 45 + sp * 35 + Math.sin(t * 0.5) * 8,
-          (1 + dx * stretch) * breath,
-          (1 - dx * stretch * 0.6) * breath
-        );
-
-        // Blob B
-        setBlob(
-          b,
-          dx * -90 + sp * 30,
-          dy * 55 + sp * 18 + Math.cos(t * 0.4) * 10,
-          (1 - dx * stretch * 0.8) * breath,
-          (1 + dy * stretch * 0.5) * breath
-        );
-
-        // Blob C
-        setBlob(
-          c,
-          dx * 55 + sp * -15,
-          dy * -70 + sp * 80 + Math.sin(t * 0.45) * 12,
-          (1 + dy * stretch * 0.5) * breath,
-          (1 + dx * stretch * 0.4) * breath
-        );
-
-        // spotlight follows mouse
-        if (spot) {
-          spot.style.setProperty('--sx', (px * window.innerWidth).toFixed(2) + 'px');
-          spot.style.setProperty('--sy', (py * window.innerHeight).toFixed(2) + 'px');
-          spot.style.opacity = idle ? '0.7' : '0.95';
-        }
-
-        // grid parallax on mouse + scroll
-        if (grid) {
-          const gx = dx * -18 + sp * 12;
-          const gy = dy * -14 + sp * 40;
-          grid.style.setProperty('--gx', gx.toFixed(2) + 'px');
-          grid.style.setProperty('--gy', gy.toFixed(2) + 'px');
-        }
-
-        requestAnimationFrame(frame);
-      }
-
-      window.addEventListener('pointermove', onMove, { passive: true });
-      window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('resize', onScroll, { passive: true });
-
-      onScroll();
-      requestAnimationFrame(frame);
+      window.addEventListener('pointermove', target, { passive: true });
     })();
 
     /* ═══════════════════════════════════════════
        BantAI — Scroll Motion
-       Scroll-linked fade + glide — reacts to scroll up AND down.
-       One passive scroll listener + a single rAF loop; opacity/translate only.
+       Reveal on scroll-down ONLY: content fades/slides in
+       the first time it enters from below, then stays fixed —
+       no animation when scrolling back up. IO-based, no rAF loop.
     ═══════════════════════════════════════════ */
-    (function initScrollMotion() {
+    (function initScrollReveal() {
       'use strict';
 
       const html = document.documentElement;
       html.classList.add('js');
 
-      // Tag every content block that should react to scroll.
-      const targets = [];
-      document.querySelectorAll('.section, .cta').forEach(el => targets.push(el));
+      // Sections + call-to-action rise as one unit.
+      document.querySelectorAll('.section, .cta').forEach(el => el.setAttribute('data-reveal', 'reveal'));
 
+      // Inner panels dock in with a natural stagger.
       [['.pipeline', '.step'], ['.bento', '.card'], ['.presets', '.preset']].forEach(pair => {
-        document.querySelectorAll(pair[0] + ' > ' + pair[1]).forEach((el, i) => {
-          el.dataset.scr = String(i * 130);
-          targets.push(el);
-        });
+        document.querySelectorAll(pair[0] + ' > ' + pair[1]).forEach(el => el.setAttribute('data-reveal', 'reveal'));
       });
+      document.querySelectorAll('.specs, .deploy-tabs').forEach(el => el.setAttribute('data-reveal', 'reveal'));
 
-      document.querySelectorAll('.specs, .deploy-tabs').forEach(el => {
-        el.dataset.scr = '0';
-        targets.push(el);
-      });
+      const els = Array.from(document.querySelectorAll('[data-reveal]'));
 
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (reduce) {
         html.classList.add('reduce-motion');
-        targets.forEach(el => {
-          el.style.opacity = '1';
-          el.style.translate = 'none';
-        });
+        els.forEach(el => el.classList.add('is-in'));
         return;
       }
 
-      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      // Anything already on screen at first paint reveals immediately.
+      els.forEach(el => {
+        const r = el.getBoundingClientRect();
+        if (r.top < window.innerHeight && r.bottom > 0) el.classList.add('is-in');
+      });
 
-      function update() {
-        const vh = window.innerHeight || 800;
-        const mid = vh / 2;
-        targets.forEach(el => {
-          const r = el.getBoundingClientRect();
-          const h = r.height || 1;
-          const c = r.top + h / 2 + (parseInt(el.dataset.scr, 10) || 0);
-          const half = mid + h / 2;
-          const dist = Math.abs(c - mid);
-          const u = clamp(1 - dist / half, 0, 1);
-          const o = clamp(0.2 + 0.8 * u, 0, 1);
-          const y = clamp(dist * 0.12, 0, 26) * (c < mid ? -1 : 1);
-
-          if (Math.abs(o - (el._so || 0)) > 0.02 || Math.abs(y - (el._sy || 0)) > 0.6) {
-            el._so = o;
-            el._sy = y;
-            el.style.opacity = o >= 1 ? '1' : String(o);
-            el.style.translate = y ? '0 ' + y.toFixed(1) + 'px' : 'none';
-          }
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (!entry.isIntersecting) return;
+          io.unobserve(entry.target);
+          entry.target.classList.add('is-in');
         });
-      }
+      }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
 
-      let queued = false;
-      const onScroll = () => {
-        if (queued) return;
-        queued = true;
-        requestAnimationFrame(() => { queued = false; update(); });
-      };
-
-      window.addEventListener('scroll', onScroll, { passive: true });
-      window.addEventListener('resize', onScroll);
-      window.addEventListener('load', onScroll);
-
-      try { update(); }
-      catch (err) {
-        targets.forEach(el => { el.style.opacity = '1'; el.style.translate = 'none'; });
-      }
+      els.forEach(el => io.observe(el));
     })();
 
   })();
